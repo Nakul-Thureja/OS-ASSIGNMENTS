@@ -1,0 +1,47 @@
+Only in linux-5.14.3: System.map-5.14.3
+Only in linux-5.14.3: System.map-Nakul
+diff -u -r ogkern/linux-5.14.3/arch/x86/entry/syscalls/syscall_64.tbl linux-5.14.3/arch/x86/entry/syscalls/syscall_64.tbl
+--- ogkern/linux-5.14.3/arch/x86/entry/syscalls/syscall_64.tbl	2021-09-12 12:31:00.000000000 +0530
++++ linux-5.14.3/arch/x86/entry/syscalls/syscall_64.tbl	2021-11-24 19:56:11.979907734 +0530
+@@ -369,6 +369,7 @@
+ 445	common	landlock_add_rule	sys_landlock_add_rule
+ 446	common	landlock_restrict_self	sys_landlock_restrict_self
+ 447	common	memfd_secret		sys_memfd_secret
++448	common	kernel_2d_memcpy	sys_kernel_2d_memcpy
+ 
+ #
+ # Due to a historical design error, certain syscalls are numbered differently
+Only in linux-5.14.3/kernel: patchfile.diff
+diff -u -r ogkern/linux-5.14.3/kernel/sys.c linux-5.14.3/kernel/sys.c
+--- ogkern/linux-5.14.3/kernel/sys.c	2021-09-12 12:31:00.000000000 +0530
++++ linux-5.14.3/kernel/sys.c	2021-11-24 20:00:48.856554982 +0530
+@@ -200,6 +200,24 @@
+ 	return error;
+ }
+ 
++SYSCALL_DEFINE4(kernel_2d_memcpy, int __user *, matrix1, int __user *, matrix2, int, rowBuffer, int, colBuffer)
++{
++	int buffSize = sizeof(int)*(rowBuffer*colBuffer);
++	int *ptr;
++    ptr = (int *)kcalloc(rowBuffer*colBuffer, sizeof(int),GFP_KERNEL);
++	if(__copy_from_user(ptr,matrix1,buffSize))
++	{	
++		printk(KERN_INFO "copy from user Error");
++		return -EFAULT;
++	}
++	if(__copy_to_user(matrix2,ptr,buffSize))
++	{	
++		printk(KERN_INFO "copy to user Error");
++		return -EFAULT;
++	}
++	return 0;
++}
++
+ SYSCALL_DEFINE3(setpriority, int, which, int, who, int, niceval)
+ {
+ 	struct task_struct *g, *p;
+Only in linux-5.14.3/kernel: sys_copy.c
+Only in linux-5.14.3: testing
+Only in linux-5.14.3/tools/objtool/arch/x86: lib
+Only in linux-5.14.3/tools/objtool: fixdep
+Only in linux-5.14.3/tools/objtool: objtool

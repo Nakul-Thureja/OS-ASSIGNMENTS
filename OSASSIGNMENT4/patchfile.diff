@@ -1,0 +1,99 @@
+Only in linux-5.14.3: System.map-ass4
+Only in linux-5.14.3: System.map-assig4
+Only in linux-5.14.3: System.map-kernel3
+Only in linux-5.14.3: System.map-kernel4
+Only in linux-5.14.3: System.map-kernel5
+Only in linux-5.14.3: System.map-kernel6
+Only in linux-5.14.3: System.map-kernel7
+Only in linux-5.14.3: System.map-kernel8
+diff -u -r NewKern/linux-5.14.3/arch/x86/entry/syscalls/syscall_64.tbl linux-5.14.3/arch/x86/entry/syscalls/syscall_64.tbl
+--- NewKern/linux-5.14.3/arch/x86/entry/syscalls/syscall_64.tbl	2021-09-12 12:31:00.000000000 +0530
++++ linux-5.14.3/arch/x86/entry/syscalls/syscall_64.tbl	2021-12-31 22:26:56.873801073 +0530
+@@ -369,7 +369,8 @@
+ 445	common	landlock_add_rule	sys_landlock_add_rule
+ 446	common	landlock_restrict_self	sys_landlock_restrict_self
+ 447	common	memfd_secret		sys_memfd_secret
+-
++448 common  reader              sys_reader
++449 common  writer              sys_writer
+ #
+ # Due to a historical design error, certain syscalls are numbered differently
+ # in x32 as compared to native x86_64.  These syscalls have numbers 512-547.
+diff -u -r NewKern/linux-5.14.3/kernel/sys.c linux-5.14.3/kernel/sys.c
+--- NewKern/linux-5.14.3/kernel/sys.c	2021-09-12 12:31:00.000000000 +0530
++++ linux-5.14.3/kernel/sys.c	2022-01-03 20:58:10.133001580 +0530
+@@ -61,7 +61,7 @@
+ #include <linux/rcupdate.h>
+ #include <linux/uidgid.h>
+ #include <linux/cred.h>
+-
++#include <linux/mutex.h>
+ #include <linux/nospec.h>
+ 
+ #include <linux/kmsg_dump.h>
+@@ -71,7 +71,6 @@
+ #include <linux/uaccess.h>
+ #include <asm/io.h>
+ #include <asm/unistd.h>
+-
+ #include "uid16.h"
+ 
+ #ifndef SET_UNALIGN_CTL
+@@ -154,12 +153,19 @@
+ EXPORT_SYMBOL(fs_overflowuid);
+ EXPORT_SYMBOL(fs_overflowgid);
+ 
++DEFINE_MUTEX(myqueue_lock);
++char *myQueue[]={NULL,NULL,NULL,NULL,NULL};
++int head = 0;
++int tail = 0;
++
+ /*
+  * Returns true if current's euid is same as p's uid or euid,
+  * or has CAP_SYS_NICE to p's user_ns.
+  *
+  * Called with rcu_read_lock, creds are safe
+  */
++
++
+ static bool set_one_prio_perm(struct task_struct *p)
+ {
+ 	const struct cred *cred = current_cred(), *pcred = __task_cred(p);
+@@ -200,6 +206,33 @@
+ 	return error;
+ }
+ 
++SYSCALL_DEFINE1(reader,char *,ptr){
++	mutex_lock(&myqueue_lock);
++	if(__copy_to_user(ptr,myQueue[head],8*sizeof(char)))
++	{	
++		printk(KERN_INFO "copy to user Error");
++		return -EFAULT;
++	}
++	printk(KERN_INFO "data dequeued: %s\n",myQueue[head]);
++	myQueue[head] = (void *)0;
++	head = (head+1)%5;
++	mutex_unlock(&myqueue_lock);
++	return 0;
++}
++
++SYSCALL_DEFINE1(writer, char *, ptr){
++	mutex_lock(&myqueue_lock);
++	myQueue[tail] = (char *)kmalloc(8*sizeof(char),GFP_KERNEL);
++	if(__copy_from_user(myQueue[tail],ptr,8*sizeof(char)))
++	{	
++		printk(KERN_INFO "copy from user Error");
++		return -EFAULT;
++	}
++	tail = (tail+1)%5;
++	mutex_unlock(&myqueue_lock);
++	return 0;
++}
++
+ SYSCALL_DEFINE3(setpriority, int, which, int, who, int, niceval)
+ {
+ 	struct task_struct *g, *p;
+Only in linux-5.14.3: testing
+Only in linux-5.14.3/tools/objtool/arch/x86: lib
+Only in linux-5.14.3/tools/objtool: fixdep
+Only in linux-5.14.3/tools/objtool: objtool

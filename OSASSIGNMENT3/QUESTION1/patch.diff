@@ -1,0 +1,85 @@
+Only in linux-5.14.3: System.map-5.14.3
+diff -u -r newlinux/linux-5.14.3/arch/x86/entry/syscalls/syscall_64.tbl linux-5.14.3/arch/x86/entry/syscalls/syscall_64.tbl
+--- newlinux/linux-5.14.3/arch/x86/entry/syscalls/syscall_64.tbl	2021-09-12 12:31:00.000000000 +0530
++++ linux-5.14.3/arch/x86/entry/syscalls/syscall_64.tbl	2021-12-15 05:12:28.766658804 +0530
+@@ -369,6 +369,7 @@
+ 445	common	landlock_add_rule	sys_landlock_add_rule
+ 446	common	landlock_restrict_self	sys_landlock_restrict_self
+ 447	common	memfd_secret		sys_memfd_secret
++448 common  delay_vruntime      sys_delay_vruntime
+ 
+ #
+ # Due to a historical design error, certain syscalls are numbered differently
+Only in linux-5.14.3/arch/x86/entry/syscalls: syscall_64.tbl.orig
+Only in linux-5.14.3/arch/x86/entry/syscalls: syscall_64.tbl.rej
+diff -u -r newlinux/linux-5.14.3/include/linux/sched.h linux-5.14.3/include/linux/sched.h
+--- newlinux/linux-5.14.3/include/linux/sched.h	2021-09-12 12:31:00.000000000 +0530
++++ linux-5.14.3/include/linux/sched.h	2021-12-15 05:14:34.389986523 +0530
+@@ -473,7 +473,7 @@
+ 	u64				sum_exec_runtime;
+ 	u64				vruntime;
+ 	u64				prev_sum_exec_runtime;
+-
++	u64				delay_vruntime;
+ 	u64				nr_migrations;
+ 
+ 	struct sched_statistics		statistics;
+Only in linux-5.14.3/include/linux: sched.h.orig
+Only in linux-5.14.3/include/linux: sched.h.rej
+diff -u -r newlinux/linux-5.14.3/kernel/sched/core.c linux-5.14.3/kernel/sched/core.c
+--- newlinux/linux-5.14.3/kernel/sched/core.c	2021-09-12 12:31:00.000000000 +0530
++++ linux-5.14.3/kernel/sched/core.c	2021-12-15 05:17:36.873311694 +0530
+@@ -3943,6 +3943,7 @@
+ 	p->se.prev_sum_exec_runtime	= 0;
+ 	p->se.nr_migrations		= 0;
+ 	p->se.vruntime			= 0;
++	p->se.delay_vruntime	= 0;
+ 	INIT_LIST_HEAD(&p->se.group_node);
+ 
+ #ifdef CONFIG_FAIR_GROUP_SCHED
+@@ -6668,6 +6669,26 @@
+  * sys_setpriority is a more generic, but much slower function that
+  * does similar things.
+  */
++ 
++SYSCALL_DEFINE2(delay_vruntime, pid_t,pid,u64,delay)
++{
++	struct pid *pid_struct = NULL;
++	struct task_struct *p = NULL;
++	if(pid<0){
++		printk(KERN_INFO "find get pid Error");
++		return -EINVAL;
++	}
++	pid_struct = find_get_pid(pid);
++	if(pid_struct==NULL){
++		printk(KERN_INFO "find get pid Error");
++		return -ESRCH;
++	}
++	
++	p = pid_task(pid_struct,PIDTYPE_PID);
++	p->se.delay_vruntime = delay*1000000;
++	return 0;
++}
++
+ SYSCALL_DEFINE1(nice, int, increment)
+ {
+ 	long nice, retval;
+Only in linux-5.14.3/kernel/sched: core.c.orig
+Only in linux-5.14.3/kernel/sched: core.c.rej
+diff -u -r newlinux/linux-5.14.3/kernel/sched/fair.c linux-5.14.3/kernel/sched/fair.c
+--- newlinux/linux-5.14.3/kernel/sched/fair.c	2021-09-12 12:31:00.000000000 +0530
++++ linux-5.14.3/kernel/sched/fair.c	2021-12-15 05:19:29.246640000 +0530
+@@ -812,6 +812,7 @@
+ 	schedstat_add(cfs_rq->exec_clock, delta_exec);
+ 
+ 	curr->vruntime += calc_delta_fair(delta_exec, curr);
++	curr->vruntime += curr->delay_vruntime;	
+ 	update_min_vruntime(cfs_rq);
+ 
+ 	if (entity_is_task(curr)) {
+Only in linux-5.14.3/kernel/sched: fair.c.orig
+Only in linux-5.14.3/kernel/sched: fair.c.rej
+Only in linux-5.14.3: patched.diff
+Only in linux-5.14.3/tools/objtool/arch/x86: lib
+Only in linux-5.14.3/tools/objtool: fixdep
+Only in linux-5.14.3/tools/objtool: objtool
